@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Real-time weather dashboard with forecasts, AQI, and favorites" />
+  <title>SkyVue — Weather Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Animated ambient layer + weather tint (weather driven by body classes in JS) -->
+  <div class="bg-stack" aria-hidden="true">
+    <div class="bg-ambient"></div>
+    <div class="bg-layer" id="bgLayer"></div>
+  </div>
+
+  <header class="top-bar">
+    <a href="#" class="brand" aria-label="SkyVue home">
+      <span class="brand-icon">◎</span>
+      SkyVue
+    </a>
+
+    <div class="top-actions">
+      <button type="button" class="icon-btn" id="voiceBtn" title="Voice search" aria-label="Voice search">
+        <span aria-hidden="true">🎤</span>
+      </button>
+      <button type="button" class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle dark or light mode">
+        <span class="theme-icon sun" aria-hidden="true">☀️</span>
+        <span class="theme-icon moon" aria-hidden="true">🌙</span>
+      </button>
+      <button type="button" class="icon-btn" id="unitToggle" title="Temperature unit" aria-label="Toggle Celsius or Fahrenheit">
+        <span id="unitLabel">°C</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="search-section">
+      <form class="search-form" id="searchForm" autocomplete="off">
+        <label class="sr-only" for="cityInput">Search city</label>
+        <div class="search-wrap">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input
+            type="text"
+            id="cityInput"
+            name="city"
+            placeholder="Search city (e.g. Tokyo, London)..."
+            maxlength="120"
+          />
+          <button type="submit" class="search-submit" id="searchSubmitBtn">
+            <span class="search-btn-text">Search</span>
+            <span class="search-btn-loading" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+      <p class="voice-hint" id="voiceHint" hidden>Listening… speak a city name</p>
+    </section>
+
+    <!-- Slim top bar — no full-screen blocker -->
+    <div class="loading-bar" id="loadingBar" hidden role="progressbar" aria-valuetext="Loading weather"></div>
+
+    <!-- Error toast -->
+    <div class="toast toast-error" id="errorToast" role="alert" hidden></div>
+
+    <!-- Offline badge -->
+    <div class="offline-badge" id="offlineBadge" hidden>
+      <span aria-hidden="true">📡</span> Offline — showing cached data
+    </div>
+
+    <div class="layout-grid">
+      <!-- Current weather card -->
+      <article class="glass-card card-main" id="mainCard">
+        <div class="card-main-top">
+          <div>
+            <h1 class="city-name" id="cityName">—</h1>
+            <p class="country-line" id="countryLine"></p>
+          </div>
+          <img class="weather-icon-lg" id="weatherIcon" src="" alt="" width="120" height="120" />
+        </div>
+        <div class="temp-row">
+          <span class="temp-big" id="tempBig">—°</span>
+          <div class="condition-meta">
+            <p class="condition-text" id="conditionText">—</p>
+            <p class="feels-like">Feels like <span id="feelsLike">—</span></p>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat">
+            <span class="stat-label">Humidity</span>
+            <span class="stat-value" id="humidity">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Wind</span>
+            <span class="stat-value" id="windSpeed">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Pressure</span>
+            <span class="stat-value" id="pressure">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Visibility</span>
+            <span class="stat-value" id="visibility">—</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- Sun & AQI -->
+      <article class="glass-card card-side">
+        <h2 class="card-title">Sun &amp; air</h2>
+        <div class="sun-row">
+          <div class="sun-item">
+            <span class="sun-emoji" aria-hidden="true">🌅</span>
+            <div>
+              <span class="sun-label">Sunrise</span>
+              <span class="sun-time" id="sunrise">—</span>
+            </div>
+          </div>
+          <div class="sun-item">
+            <span class="sun-emoji" aria-hidden="true">🌇</span>
+            <div>
+              <span class="sun-label">Sunset</span>
+              <span class="sun-time" id="sunset">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="aqi-block" id="aqiBlock">
+          <span class="aqi-label">Air Quality (AQI)</span>
+          <div class="aqi-meter">
+            <span class="aqi-value" id="aqiValue">—</span>
+            <span class="aqi-desc" id="aqiDesc">—</span>
+          </div>
+          <div class="aqi-bar"><div class="aqi-fill" id="aqiFill"></div></div>
+        </div>
+      </article>
+
+      <!-- Alerts -->
+      <article class="glass-card card-alerts" id="alertsCard">
+        <h2 class="card-title">Alerts</h2>
+        <ul class="alert-list" id="alertList"></ul>
+      </article>
+
+      <!-- Hourly -->
+      <article class="glass-card card-hourly">
+        <h2 class="card-title">Next 24 hours <span class="card-title-hint">(3-hour steps)</span></h2>
+        <div class="hourly-scroll" id="hourlyScroll" role="region" aria-label="Hourly forecast scroll area"></div>
+      </article>
+
+      <!-- Daily forecast -->
+      <article class="glass-card card-daily">
+        <h2 class="card-title">5-day outlook</h2>
+        <div class="daily-grid" id="dailyGrid"></div>
+      </article>
+
+      <!-- Favorites -->
+      <article class="glass-card card-favorites">
+        <div class="favorites-head">
+          <h2 class="card-title">Favorite cities</h2>
+          <button type="button" class="text-btn" id="saveFavoriteBtn" title="Save current city">
+            + Save current
+          </button>
+        </div>
+        <div class="chips" id="favoritesChips"></div>
+      </article>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>
+      Data by <a href="https://openweathermap.org/" target="_blank" rel="noopener noreferrer">OpenWeather</a>.
+      Add your API key in <code>script.js</code>.
+    </p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
